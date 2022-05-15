@@ -68,7 +68,7 @@ def publish(client):
         if status == 0:
             print(f"Send msg to topic `{topic}`")
         else:
-            print(f"Failed to send message to topic {topic}")
+            print(f"Failed to send message to this topic {topic}")
 
 def run():
     client = connect_mqtt()
