@@ -1,32 +1,45 @@
+#!/usr/bin/python
+
+import threading
 import random
 import time
 import json
 
 from paho.mqtt import client as mqtt_client
-
-i = '10'
-broker = '192.168.98.'+i
+exitFlag = 0
 port = 1883
 topic = "vanetza/in/cam"
-# generate client ID with pub prefix randomly
-client_id = f'python-mqtt-{random.randint(0, 1000)}'
 
-def connect_mqtt():
+class myThread (threading.Thread):
+    def __init__(self, threadID, name, delay):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+        self.delay = delay
+        self.brokerIp = '192.168.98.' + str(threadID*10)
+    def run(self):
+        print("Starting " + self.name)
+        client = connect_mqtt(self.threadID,self.brokerIp)
+        client.loop_start()
+        publish(client,self.delay,self.threadID)
+        # print_time(self.name, 5, self.counter)
+        print("Exiting " + self.name)
+
+def connect_mqtt(id,broker):
     def on_connect(client, userdata, flags, rc):
         if rc == 0:
             print("Connected to MQTT Broker!")
         else:
             print("Failed to connect, return code %d\n", rc)
 
-    client = mqtt_client.Client(client_id)
+    client = mqtt_client.Client(str(id))
     client.on_connect = on_connect
     client.connect(broker,port)
     return client
 
-
-def publish(client):
+def publish(client,delay,stationID):
     while True:
-        time.sleep(1)
+        time.sleep(delay)
         x = {
             "accEngaged": True,
             "acceleration": 0,
@@ -55,7 +68,7 @@ def publish(client):
             "speed": 16383,
             "speedConf": 127,
             "speedLimiter": True,
-            "stationID": 1,
+            "stationID": stationID,
             "stationType": 5,
             "width": 30,
             "yawRate": 0
@@ -70,11 +83,16 @@ def publish(client):
         else:
             print(f"Failed to send message to this topic {topic}")
 
-def run():
-    client = connect_mqtt()
-    client.loop_start()
-    publish(client)
+# Create new threads
+thread1 = myThread(1, "OBU-1", 10)
+thread2 = myThread(2, "OBU-2", 10)
+thread3 = myThread(3, "OBU-3", 10)
+thread4 = myThread(4, "OBU-4", 10)
 
+# Start new Threads
+thread1.start()
+thread2.start()
+thread3.start()
+thread4.start()
 
-if __name__ == '__main__':
-    run()
+# print("Exiting Main Thread")
