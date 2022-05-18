@@ -6,23 +6,31 @@ import time
 import json
 
 from paho.mqtt import client as mqtt_client
-exitFlag = 0
+
 port = 1883
-topic = "vanetza/in/cam"
+topic_in = "vanetza/in/cam"
+topic_out = "vanetza/out/cam"
+
 
 class myThread (threading.Thread):
-    def __init__(self, threadID, name, delay):
+    def __init__(self, threadID, name, delay, lat,obus_recv):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
         self.delay = delay
         self.brokerIp = '192.168.98.' + str(threadID*10)
+        self.OBUSinFront = obus_recv
+        self.initialLatitude = lat
+
     def run(self):
         print("Starting " + self.name)
         client = connect_mqtt(self.threadID,self.brokerIp)
         client.loop_start()
-        publish(client,self.delay,self.threadID)
-        # print_time(self.name, 5, self.counter)
+        # for obu in self.OBUSinFront:
+        #
+        t1 = threading.Thread(target=publish,args=(client,self.delay,self.threadID,self.initialLatitude))
+        t1.start()
+        # publish(client,self.delay,self.threadID,self.initialLatitude)
         print("Exiting " + self.name)
 
 def connect_mqtt(id,broker):
@@ -37,7 +45,7 @@ def connect_mqtt(id,broker):
     client.connect(broker,port)
     return client
 
-def publish(client,delay,stationID):
+def publish(client,delay,stationID,lat):
     while True:
         time.sleep(delay)
         x = {
@@ -54,7 +62,7 @@ def publish(client,delay,stationID):
             "gasPedal": False,
             "heading": 3601, #10¹
             "headingConf": 127,
-            "latitude": 400000000, #10⁷
+            "latitude": lat, #10⁷
             "length": 100,
             "longitude": -80000000, #10⁷
             "semiMajorConf": 4095,
@@ -75,19 +83,56 @@ def publish(client,delay,stationID):
         }
         msg = json.dumps(x)
         print(msg)
-        result = client.publish(topic, msg)
+        result = client.publish(topic_in, msg)
         # result: [0, 1]
         status = result[0]
         if status == 0:
-            print(f"Send msg to topic `{topic}`")
+            print(f"Send msg to topic `{topic_in}`")
         else:
-            print(f"Failed to send message to this topic {topic}")
+            print(f"Failed to send message to this topic {topic_in}")
+
+def getLats():
+    my_dict = {}
+    for x in range(4):
+        my_dict[x] = random.randint(400000000,400010000)
+    print(my_dict)
+    return my_dict
+
+def sortDict(dict):
+    indexes = []
+
+    sorted_values = sorted(dict.values()) # Sort the values
+    sorted_dict = {}
+
+    for i in sorted_values:
+        for k in dict.keys():
+            if dict[k] == i:
+                sorted_dict[k] = dict[k]
+                break
+
+    for k in sorted_dict:
+        indexes.append(k)
+
+    return indexes
+
+latitudes_unsorted = getLats()
+latitudes_sorted = sortDict(latitudes_unsorted)
+
+my_list = []
+for x in range(4):
+    temp_list = []
+    for y in latitudes_sorted:
+        if(x == y):
+            break
+        else:
+            temp_list.append(y+1)
+    my_list.append(temp_list)
 
 # Create new threads
-thread1 = myThread(1, "OBU-1", 10)
-thread2 = myThread(2, "OBU-2", 10)
-thread3 = myThread(3, "OBU-3", 10)
-thread4 = myThread(4, "OBU-4", 10)
+thread1 = myThread(1, "OBU-1", 10, latitudes_unsorted[0], my_list[0])
+thread2 = myThread(2, "OBU-2", 10, latitudes_unsorted[1], my_list[1])
+thread3 = myThread(3, "OBU-3", 10, latitudes_unsorted[2], my_list[2])
+thread4 = myThread(4, "OBU-4", 10, latitudes_unsorted[3], my_list[3])
 
 # Start new Threads
 thread1.start()
