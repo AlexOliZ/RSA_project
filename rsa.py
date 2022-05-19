@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from pydoc import cli
 import threading
 import random
 import time
@@ -14,43 +15,35 @@ topic_out = "vanetza/out/cam"
 
 
 class myThread (threading.Thread):
-    def __init__(self, threadID, name, delay, lat,obus_recv):
-        # print(obus_recv)
+    def __init__(self, threadID, name, delay, lat,obu_recv):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
         self.delay = delay
         self.brokerIp = '192.168.98.' + str(threadID*10)
-        self.OBUSinFront = obus_recv
+        self.OBUinFront = obu_recv
         self.initialLatitude = lat
         self.flag = True
+        self.speed = 0
+
     def run(self):
         print("Starting " + self.name)
         client = connect_mqtt(self.threadID,self.brokerIp)
         client.loop_start()
         t1 = threading.Thread(target=publish,args=(client,self.delay,self.threadID,self.initialLatitude))
         t1.start()
-        # print(self.OBUSinFront)
+
         id = 'client_id'
-        # if(self.flag):
-            # for obu in self.OBUSinFront:
-                # print(self.OBUSinFront)
-                # clientid = id+str(self.threadID)+str(obu)
         clientid = id+str(self.threadID)+str(self.threadID)
-
-                # print(clientid)
-                # client = connect_mqtt(clientid,'192.168.98.'+str(obu*10))   
         client = connect_mqtt(clientid,self.brokerIp)   
-
         subscribe(client)
         client.loop_start()
-                # self.flag = False 
      
-        # client2.loop_start()
-
-        # t2 = threading.Thread(target=subscribe,args=(client2))
-        # publish(client,self.delay,self.threadID,self.initialLatitude)
         print("Exiting " + self.name)
+
+    def changeLocation(self,speed):
+        self.speed = speed
+        print("id"+str(self.threadID)+"speed="+str(self.speed))
 
 def connect_mqtt(id,broker):
     def on_connect(client, userdata, flags, rc):
@@ -112,12 +105,24 @@ def publish(client,delay,stationID,lat):
 
 def subscribe(client: mqtt_client):
     def on_message(client, userdata, msg):
+        # global thread1
         m_decode = str(msg.payload.decode())
         m_json = json.loads(m_decode)
-        print(m_json["stationID"])
-        # print("")
+        speed = m_json["speed"]
+        if(m_json["receiverID"] == 1):
+            if(m_json["stationID"] == thread1.OBUinFront):
+                thread1.changeLocation(speed)
+        elif(m_json["receiverID"] == 2):
+            if(m_json["stationID"] == thread2.OBUinFront):
+                thread2.changeLocation(speed)
+        elif(m_json["receiverID"] == 3):
+            if(m_json["stationID"] == thread3.OBUinFront):
+                thread3.changeLocation(speed)
+        elif(m_json["receiverID"] == 4):
+            if(m_json["stationID"] == thread4.OBUinFront):
+                thread4.changeLocation(speed)
+        # print(speed)
         # print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
-
     client.subscribe(topic_out)
     client.on_message = on_message
 
@@ -148,23 +153,33 @@ def sortDict(dict):
 latitudes_unsorted = getLats()
 latitudes_sorted = sortDict(latitudes_unsorted)
 
+# print(latitudes_sorted)
+
 my_list = []
 for x in range(4):
     temp_list = []
+    last_element = 0
+
     for y in latitudes_sorted:
         if(x == y):
             break
         else:
             temp_list.append(y+1)
-    my_list.append(temp_list)
 
+    if(temp_list != []):
+        last_element = temp_list[-1]
+    else:
+        last_element = -1
+    my_list.append(last_element)
+
+# print(my_list)
 # Create new threads
 thread1 = myThread(1, "OBU-1", 10, latitudes_unsorted[0], my_list[0])
 thread2 = myThread(2, "OBU-2", 10, latitudes_unsorted[1], my_list[1])
 thread3 = myThread(3, "OBU-3", 10, latitudes_unsorted[2], my_list[2])
 thread4 = myThread(4, "OBU-4", 10, latitudes_unsorted[3], my_list[3])
 
-# Start new Threads
+# # Start new Threads
 thread1.start()
 thread2.start()
 thread3.start()
