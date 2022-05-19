@@ -12,8 +12,10 @@ topic_in = "vanetza/in/cam"
 topic_out = "vanetza/out/cam"
 
 
+
 class myThread (threading.Thread):
     def __init__(self, threadID, name, delay, lat,obus_recv):
+        # print(obus_recv)
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
@@ -21,22 +23,39 @@ class myThread (threading.Thread):
         self.brokerIp = '192.168.98.' + str(threadID*10)
         self.OBUSinFront = obus_recv
         self.initialLatitude = lat
-
+        self.flag = True
     def run(self):
         print("Starting " + self.name)
         client = connect_mqtt(self.threadID,self.brokerIp)
         client.loop_start()
-        # for obu in self.OBUSinFront:
-        #
         t1 = threading.Thread(target=publish,args=(client,self.delay,self.threadID,self.initialLatitude))
         t1.start()
+        # print(self.OBUSinFront)
+        id = 'client_id'
+        # if(self.flag):
+            # for obu in self.OBUSinFront:
+                # print(self.OBUSinFront)
+                # clientid = id+str(self.threadID)+str(obu)
+        clientid = id+str(self.threadID)+str(self.threadID)
+
+                # print(clientid)
+                # client = connect_mqtt(clientid,'192.168.98.'+str(obu*10))   
+        client = connect_mqtt(clientid,self.brokerIp)   
+
+        subscribe(client)
+        client.loop_start()
+                # self.flag = False 
+     
+        # client2.loop_start()
+
+        # t2 = threading.Thread(target=subscribe,args=(client2))
         # publish(client,self.delay,self.threadID,self.initialLatitude)
         print("Exiting " + self.name)
 
 def connect_mqtt(id,broker):
     def on_connect(client, userdata, flags, rc):
         if rc == 0:
-            print("Connected to MQTT Broker!")
+            print("Connected to MQTT Broker %d!",id)
         else:
             print("Failed to connect, return code %d\n", rc)
 
@@ -82,7 +101,7 @@ def publish(client,delay,stationID,lat):
             "yawRate": 0
         }
         msg = json.dumps(x)
-        print(msg)
+        # print(msg)
         result = client.publish(topic_in, msg)
         # result: [0, 1]
         status = result[0]
@@ -90,6 +109,17 @@ def publish(client,delay,stationID,lat):
             print(f"Send msg to topic `{topic_in}`")
         else:
             print(f"Failed to send message to this topic {topic_in}")
+
+def subscribe(client: mqtt_client):
+    def on_message(client, userdata, msg):
+        m_decode = str(msg.payload.decode())
+        m_json = json.loads(m_decode)
+        print(m_json["stationID"])
+        # print("")
+        # print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
+
+    client.subscribe(topic_out)
+    client.on_message = on_message
 
 def getLats():
     my_dict = {}
