@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from os import stat
 from pydoc import cli
 import threading
 import random
@@ -22,15 +23,24 @@ class myThread (threading.Thread):
         self.delay = delay
         self.brokerIp = '192.168.98.' + str(threadID*10)
         self.OBUinFront = obu_recv
-        self.initialLatitude = lat
-        self.flag = True
+        if(obu_recv == -1):
+            self.leader = True
+        else:
+            self.leader = False
+            self.leaderSpeed = 0
+        self.Latitude = lat
         self.speed = 0
+        self.started = False
+        self.updateValues = False
+
+    def get_speed(self):
+        return self.speed
 
     def run(self):
         print("Starting " + self.name)
         client = connect_mqtt(self.threadID,self.brokerIp)
         client.loop_start()
-        t1 = threading.Thread(target=publish,args=(client,self.delay,self.threadID,self.initialLatitude))
+        t1 = threading.Thread(target=publish,args=(client,self.delay,self.threadID,self.Latitude,self.speed))
         t1.start()
 
         id = 'client_id'
@@ -39,16 +49,38 @@ class myThread (threading.Thread):
         subscribe(client)
         client.loop_start()
      
-        print("Exiting " + self.name)
+        # print("Exiting " + self.name)
 
-    def changeLocation(self,speed):
-        self.speed = speed
-        print("id"+str(self.threadID)+"speed="+str(self.speed))
+    def changeLocation(self,json):
+        # self.speed = json["speed"]
+        # print("id"+str(self.threadID)+"speed="+str(self.speed))
+        # print("id"+str(self.threadID)+"json:="+str(json["heading"]))
+
+        if(self.leader):
+            # print(self.threadID)
+            if(self.started != True):
+                print("Not Started")
+
+                self.started = True
+                self.speed += 2 #+2m/s
+                self.Latitude += (self.speed*self.delay*10)
+                # print(self.speed)
+            else:
+                print("Started")
+                self.speed += 2 #+2m/s
+                self.Latitude += (self.speed*self.delay*10)
+                # print(self.speed)
+        else:
+            self.speed += json["speed"]
+            self.Latitude += (self.speed*self.delay*10)
+            print("OBU"+str(self.threadID)+" received from "+str(json["stationID"])+" with coordinates("+str(json["latitude"])+","+str(json["longitude"])+")")
+    
+
 
 def connect_mqtt(id,broker):
     def on_connect(client, userdata, flags, rc):
         if rc == 0:
-            print("Connected to MQTT Broker %d!",id)
+            print("Connected to MQTT Broker!")
         else:
             print("Failed to connect, return code %d\n", rc)
 
@@ -57,9 +89,23 @@ def connect_mqtt(id,broker):
     client.connect(broker,port)
     return client
 
-def publish(client,delay,stationID,lat):
+def publish(client,delay,stationID,lat,speed):
     while True:
         time.sleep(delay)
+        # if thread1.threadID == stationID:
+        #     speed = thread1.speed
+        #     lat = thread1.Latitude
+        # elif thread2.threadID == stationID:
+        #     speed = thread2.speed
+        #     lat = thread2.Latitude
+        # elif thread3.threadID == stationID:
+        #     speed = thread3.speed
+        #     lat = thread3.Latitude
+        # elif thread4.threadID == stationID:
+        #     speed = thread4.speed
+        #     lat = thread4.Latitude
+
+        # print(speed)
         x = {
             "accEngaged": True,
             "acceleration": 0,
@@ -85,7 +131,7 @@ def publish(client,delay,stationID,lat):
                     "embarkationStatus": False
                 }
             },
-            "speed": 16383,
+            "speed": speed*10,
             "speedConf": 127,
             "speedLimiter": True,
             "stationID": stationID,
@@ -102,6 +148,10 @@ def publish(client,delay,stationID,lat):
             print(f"Send msg to topic `{topic_in}`")
         else:
             print(f"Failed to send message to this topic {topic_in}")
+        # thread1.updateValues = False
+        # thread2.updateValues = False
+        # thread3.updateValues = False
+        # thread4.updateValues = False
 
 def subscribe(client: mqtt_client):
     def on_message(client, userdata, msg):
@@ -109,18 +159,31 @@ def subscribe(client: mqtt_client):
         m_decode = str(msg.payload.decode())
         m_json = json.loads(m_decode)
         speed = m_json["speed"]
+
         if(m_json["receiverID"] == 1):
             if(m_json["stationID"] == thread1.OBUinFront):
-                thread1.changeLocation(speed)
+                thread1.changeLocation(m_json)
+            elif(thread1.OBUinFront == -1):
+                thread1.changeLocation(m_json)
+                # thread1.updateValues = True
         elif(m_json["receiverID"] == 2):
             if(m_json["stationID"] == thread2.OBUinFront):
-                thread2.changeLocation(speed)
+                thread2.changeLocation(m_json)
+            elif(thread2.OBUinFront == -1):
+                thread2.changeLocation(m_json)
+                # thread2.updateValues = True
         elif(m_json["receiverID"] == 3):
             if(m_json["stationID"] == thread3.OBUinFront):
-                thread3.changeLocation(speed)
+                thread3.changeLocation(m_json)
+            elif(thread3.OBUinFront == -1):
+                thread3.changeLocation(m_json)
+                # thread3.updateValues = True
         elif(m_json["receiverID"] == 4):
             if(m_json["stationID"] == thread4.OBUinFront):
-                thread4.changeLocation(speed)
+                thread4.changeLocation(m_json)
+            elif(thread4.OBUinFront == -1):
+                thread4.changeLocation(m_json)
+                # thread4.updateValues = True
         # print(speed)
         # print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
     client.subscribe(topic_out)
@@ -129,7 +192,7 @@ def subscribe(client: mqtt_client):
 def getLats():
     my_dict = {}
     for x in range(4):
-        my_dict[x] = random.randint(400000000,400010000)
+        my_dict[x] = random.randint(400000000,400001000)
     print(my_dict)
     return my_dict
 
@@ -174,10 +237,10 @@ for x in range(4):
 
 # print(my_list)
 # Create new threads
-thread1 = myThread(1, "OBU-1", 10, latitudes_unsorted[0], my_list[0])
-thread2 = myThread(2, "OBU-2", 10, latitudes_unsorted[1], my_list[1])
-thread3 = myThread(3, "OBU-3", 10, latitudes_unsorted[2], my_list[2])
-thread4 = myThread(4, "OBU-4", 10, latitudes_unsorted[3], my_list[3])
+thread1 = myThread(1, "OBU-1", 0.2, latitudes_unsorted[0], my_list[0])
+thread2 = myThread(2, "OBU-2", 0.2, latitudes_unsorted[1], my_list[1])
+thread3 = myThread(3, "OBU-3", 0.2, latitudes_unsorted[2], my_list[2])
+thread4 = myThread(4, "OBU-4", 0.2, latitudes_unsorted[3], my_list[3])
 
 # # Start new Threads
 thread1.start()
