@@ -6,6 +6,7 @@ import threading
 import random
 import time
 import json
+import math
 
 from paho.mqtt import client as mqtt_client
 
@@ -13,12 +14,15 @@ port = 1883
 topic_in = "vanetza/in/cam"
 topic_out = "vanetza/out/cam"
 
-
+speed_limit = 30 #m/s = 108km/h
+count = 0
+track = 1000 #m
+theoric_dist = 1 #m
 
 class myThread (threading.Thread):
     def __init__(self, threadID, name, delay, lat,obu_recv):
         threading.Thread.__init__(self)
-        self.threadID = threadID
+        self.stationID = threadID
         self.name = name
         self.delay = delay
         self.brokerIp = '192.168.98.' + str(threadID*10)
@@ -27,56 +31,76 @@ class myThread (threading.Thread):
             self.leader = True
         else:
             self.leader = False
-            self.leaderSpeed = 0
+            self.leaderLat = -1
+            self.leaderDist = -1
         self.Latitude = lat
         self.speed = 0
         self.started = False
         self.updateValues = False
-
-    def get_speed(self):
-        return self.speed
+        self.finishLat = lat - track*100
+        self.finish = False
+        # self.i = 0
 
     def run(self):
         print("Starting " + self.name)
-        client = connect_mqtt(self.threadID,self.brokerIp)
+        client = connect_mqtt(self.stationID,self.brokerIp)
         client.loop_start()
-        t1 = threading.Thread(target=publish,args=(client,self.delay,self.threadID,self.Latitude,self.speed))
+        t1 = threading.Thread(target=publish,args=(client,self.delay,self))
         t1.start()
 
         id = 'client_id'
-        clientid = id+str(self.threadID)+str(self.threadID)
+        clientid = id+str(self.stationID)+str(self.stationID)
         client = connect_mqtt(clientid,self.brokerIp)   
-        subscribe(client)
+        subscribe(client,self)
         client.loop_start()
      
         # print("Exiting " + self.name)
 
     def changeLocation(self,json):
-        # self.speed = json["speed"]
-        # print("id"+str(self.threadID)+"speed="+str(self.speed))
-        # print("id"+str(self.threadID)+"json:="+str(json["heading"]))
-
         if(self.leader):
-            # print(self.threadID)
-            if(self.started != True):
-                print("Not Started")
+            # print(self.Latitude)
+            # print(self.finishLat)
 
-                self.started = True
-                self.speed += 2 #+2m/s
-                self.Latitude += (self.speed*self.delay*10)
+            if(self.Latitude < self.finishLat):
+                self.speed = 0
+                self.finish = True
+                print("FINISHED")
+            elif(self.speed < speed_limit):
+                self.speed += 2
+                self.Latitude -= (self.speed*self.delay)*100
                 # print(self.speed)
             else:
-                print("Started")
-                self.speed += 2 #+2m/s
-                self.Latitude += (self.speed*self.delay*10)
+                self.Latitude -= (self.speed*self.delay)*100
                 # print(self.speed)
+            # self.i+=1  
+            # print("i="+str(self.i))   
+            print("LEADER OBU"+str(self.stationID)+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
+   
         else:
-            self.speed += json["speed"]
-            self.Latitude += (self.speed*self.delay*10)
-            print("OBU"+str(self.threadID)+" received from "+str(json["stationID"])+" with coordinates("+str(json["latitude"])+","+str(json["longitude"])+")")
+            self.Latitude -= (self.speed*self.delay)*100
+            # if(self.leaderLat == -1):
+            #     self.leaderLat = json["latitude"]*10000000
+            #     self.leaderDist = (self.Latitude - self.leaderLat) / 100   
+            #     # print(str(math.floor(self.leaderDist - theoric_dist))+"m")
+            # else:
+            # print("leader="+str(self.leaderLat) + " my = "+ str(self.Latitude)+"\n")
+            self.leaderLat = json["latitude"]*10000000
+            self.leaderDist = (self.Latitude - self.leaderLat) / 100
+            # print(str(self.leaderDist)+"\n")
+            delta = math.floor((self.leaderDist - theoric_dist)/2)
+            print(str(delta)+"m")
+            if(delta > 0 and self.speed <= 30):
+                self.speed += delta/self.delay + 2
+            elif(delta > 0 and self.speed > 15):
+                self.speed += delta/self.delay                
+            elif(self.speed > 0 and delta < 0):
+                self.speed -= math.ceil(self.speed/5)
+
+            
+            # print("OBU"+str(self.stationID) +" received from "+str(json["stationID"])+ " speed= "+ str(json["speed"]))
+            print("OBU"+str(self.stationID)+" received from "+str(json["stationID"])+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
+            # print("OBU"+str(self.stationID)+" received from "+str(json["stationID"])+" with coordinates("+str(json["latitude"])+","+str(json["longitude"])+")")
     
-
-
 def connect_mqtt(id,broker):
     def on_connect(client, userdata, flags, rc):
         if rc == 0:
@@ -89,23 +113,14 @@ def connect_mqtt(id,broker):
     client.connect(broker,port)
     return client
 
-def publish(client,delay,stationID,lat,speed):
+def publish(client,delay,obu):
     while True:
         time.sleep(delay)
-        # if thread1.threadID == stationID:
-        #     speed = thread1.speed
-        #     lat = thread1.Latitude
-        # elif thread2.threadID == stationID:
-        #     speed = thread2.speed
-        #     lat = thread2.Latitude
-        # elif thread3.threadID == stationID:
-        #     speed = thread3.speed
-        #     lat = thread3.Latitude
-        # elif thread4.threadID == stationID:
-        #     speed = thread4.speed
-        #     lat = thread4.Latitude
-
-        # print(speed)
+        # print(obu.speed)
+        # print(str(obu.stationID)+"this speed isssssss =>"+str(obu.speed))
+        if(obu.finish == True):
+            client.disconnect()
+            break
         x = {
             "accEngaged": True,
             "acceleration": 0,
@@ -118,11 +133,11 @@ def publish(client,delay,stationID,lat,speed):
             "driveDirection": "FORWARD",
             "emergencyBrake": True,
             "gasPedal": False,
-            "heading": 3601, #10¹
+            "heading": 3601,
             "headingConf": 127,
-            "latitude": lat, #10⁷
-            "length": 100,
-            "longitude": -80000000, #10⁷
+            "latitude": obu.Latitude/10000000,
+            "length": 10.0,
+            "longitude": -8.0000000,
             "semiMajorConf": 4095,
             "semiMajorOrient": 3601,
             "semiMinorConf": 4095,
@@ -131,14 +146,15 @@ def publish(client,delay,stationID,lat,speed):
                     "embarkationStatus": False
                 }
             },
-            "speed": speed*10,
+            "speed": obu.speed,
             "speedConf": 127,
             "speedLimiter": True,
-            "stationID": stationID,
+            "stationID": obu.stationID,
             "stationType": 5,
-            "width": 30,
+            "width": 3.0,
             "yawRate": 0
-        }
+}
+
         msg = json.dumps(x)
         # print(msg)
         result = client.publish(topic_in, msg)
@@ -148,42 +164,26 @@ def publish(client,delay,stationID,lat,speed):
             print(f"Send msg to topic `{topic_in}`")
         else:
             print(f"Failed to send message to this topic {topic_in}")
-        # thread1.updateValues = False
-        # thread2.updateValues = False
-        # thread3.updateValues = False
-        # thread4.updateValues = False
 
-def subscribe(client: mqtt_client):
+def subscribe(client: mqtt_client,obu):
     def on_message(client, userdata, msg):
-        # global thread1
+        global count
+
         m_decode = str(msg.payload.decode())
         m_json = json.loads(m_decode)
-        speed = m_json["speed"]
+        # speed = m_json["speed"]
 
-        if(m_json["receiverID"] == 1):
-            if(m_json["stationID"] == thread1.OBUinFront):
-                thread1.changeLocation(m_json)
-            elif(thread1.OBUinFront == -1):
-                thread1.changeLocation(m_json)
-                # thread1.updateValues = True
-        elif(m_json["receiverID"] == 2):
-            if(m_json["stationID"] == thread2.OBUinFront):
-                thread2.changeLocation(m_json)
-            elif(thread2.OBUinFront == -1):
-                thread2.changeLocation(m_json)
-                # thread2.updateValues = True
-        elif(m_json["receiverID"] == 3):
-            if(m_json["stationID"] == thread3.OBUinFront):
-                thread3.changeLocation(m_json)
-            elif(thread3.OBUinFront == -1):
-                thread3.changeLocation(m_json)
-                # thread3.updateValues = True
-        elif(m_json["receiverID"] == 4):
-            if(m_json["stationID"] == thread4.OBUinFront):
-                thread4.changeLocation(m_json)
-            elif(thread4.OBUinFront == -1):
-                thread4.changeLocation(m_json)
-                # thread4.updateValues = True
+        if(m_json["stationID"] == obu.OBUinFront):
+            obu.changeLocation(m_json)
+        elif(obu.OBUinFront == -1 and count < 1):
+            obu.changeLocation(m_json)
+            count += 1
+        elif(obu.OBUinFront == -1 and count >= 1):
+            count += 1
+        
+        if count == 3:
+            count = 0
+            # print("reset")
         # print(speed)
         # print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
     client.subscribe(topic_out)
@@ -237,10 +237,11 @@ for x in range(4):
 
 # print(my_list)
 # Create new threads
-thread1 = myThread(1, "OBU-1", 0.2, latitudes_unsorted[0], my_list[0])
-thread2 = myThread(2, "OBU-2", 0.2, latitudes_unsorted[1], my_list[1])
-thread3 = myThread(3, "OBU-3", 0.2, latitudes_unsorted[2], my_list[2])
-thread4 = myThread(4, "OBU-4", 0.2, latitudes_unsorted[3], my_list[3])
+freq_sending = 1
+thread1 = myThread(1, "OBU-1", freq_sending, latitudes_unsorted[0], my_list[0])
+thread2 = myThread(2, "OBU-2", freq_sending, latitudes_unsorted[1], my_list[1])
+thread3 = myThread(3, "OBU-3", freq_sending, latitudes_unsorted[2], my_list[2])
+thread4 = myThread(4, "OBU-4", freq_sending, latitudes_unsorted[3], my_list[3])
 
 # # Start new Threads
 thread1.start()
