@@ -1,0 +1,61 @@
+<html>
+    <style>
+        #obu1 {
+            background-color:#e00909;
+            width: 30px;
+            height: 30px;
+            position: absolute;
+            left: 500;
+            top: 400;
+        }
+        #obu2 {
+            background-color:#3009e0;
+            width: 30px;
+            height: 30px;
+            position: absolute;
+            left: 500;
+            top: 400;
+        }
+        #obu3 {
+            background-color:#14e009;
+            width: 30px;
+            height: 30px;
+            position: absolute;
+            left: 500;
+            top: 400;
+        }
+        #obu4 {
+            background-color:#e009ce;
+            width: 30px;
+            height: 30px;
+            position: absolute;
+            left: 500;
+            top: 400;
+        }         
+    </style>
+
+    <script>
+        var lat = 0;
+        var long = 400;
+        
+        window.onload = function()
+        {
+            var obu1 = document.getElementById("obu1");
+            var obu2 = document.getElementById("obu2");
+            var obu3 = document.getElementById("obu3");
+            var obu4 = document.getElementById("obu4");
+
+            setInterval(function()
+            {
+                lat++;
+                obu1.style.left = lat;
+                obu1.style.top = long;
+            },1);
+        }
+        
+    </script>
+    <div id="obu1"></div>
+    <div id="obu2"></div>
+    <div id="obu3"></div>
+    <div id="obu4"></div>
+</html>

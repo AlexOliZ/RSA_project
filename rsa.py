@@ -17,7 +17,7 @@ topic_out = "vanetza/out/cam"
 speed_limit = 30 #m/s = 108km/h
 count = 0
 track = 1000 #m
-theoric_dist = 1 #m
+theoric_dist = 2 #m
 
 class myThread (threading.Thread):
     def __init__(self, threadID, name, delay, lat,obu_recv):
@@ -66,7 +66,7 @@ class myThread (threading.Thread):
                 self.finish = True
                 print("FINISHED")
             elif(self.speed < speed_limit):
-                self.speed += 2
+                self.speed += 3
                 self.Latitude -= (self.speed*self.delay)*100
                 # print(self.speed)
             else:
@@ -87,14 +87,26 @@ class myThread (threading.Thread):
             self.leaderLat = json["latitude"]*10000000
             self.leaderDist = (self.Latitude - self.leaderLat) / 100
             # print(str(self.leaderDist)+"\n")
-            delta = math.floor((self.leaderDist - theoric_dist)/2)
-            print(str(delta)+"m")
-            if(delta > 0 and self.speed <= 30):
-                self.speed += delta/self.delay + 2
-            elif(delta > 0 and self.speed > 15):
-                self.speed += delta/self.delay                
-            elif(self.speed > 0 and delta < 0):
-                self.speed -= math.ceil(self.speed/5)
+            delta = math.floor((self.leaderDist - theoric_dist))
+            print("obu"+ str(self.stationID)+" dist= "+str(self.leaderDist)+"m")
+
+            # if(json["speed"] > self.speed and delta > 0 and self.speed < 10):
+            #     # self.speed += delta/self.delay + 2
+            #     self.speed += math.ceil(1.5*self.speed+1)
+            # elif(delta > 0 and self.speed >= 10 and self.speed < 28):
+            #      self.speed += 3 
+            # elif(delta > 20 and self.speed > 20):
+            #     self.speed += 5         
+            # elif(self.speed > 10 and delta < 10):
+            #     self.speed -= math.ceil(self.speed/4)
+
+            if(json["speed"] > self.speed and delta > 0 and self.speed < 25):
+                # self.speed += delta/self.delay + 2
+                self.speed += 3 
+            elif(delta > 20 and self.speed >= 25 and self.speed < 35):
+                self.speed += 5        
+            elif(self.speed > 30 and delta < 15):
+                self.speed -= math.ceil(self.speed/4)
 
             
             # print("OBU"+str(self.stationID) +" received from "+str(json["stationID"])+ " speed= "+ str(json["speed"]))
