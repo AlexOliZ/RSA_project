@@ -1,61 +1,62 @@
-<html>
-    <style>
-        #obu1 {
-            background-color:#e00909;
-            width: 30px;
-            height: 30px;
-            position: absolute;
-            left: 500;
-            top: 400;
-        }
-        #obu2 {
-            background-color:#3009e0;
-            width: 30px;
-            height: 30px;
-            position: absolute;
-            left: 500;
-            top: 400;
-        }
-        #obu3 {
-            background-color:#14e009;
-            width: 30px;
-            height: 30px;
-            position: absolute;
-            left: 500;
-            top: 400;
-        }
-        #obu4 {
-            background-color:#e009ce;
-            width: 30px;
-            height: 30px;
-            position: absolute;
-            left: 500;
-            top: 400;
-        }         
-    </style>
 
-    <script>
-        var lat = 0;
-        var long = 400;
-        
-        window.onload = function()
-        {
-            var obu1 = document.getElementById("obu1");
-            var obu2 = document.getElementById("obu2");
-            var obu3 = document.getElementById("obu3");
-            var obu4 = document.getElementById("obu4");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+	<title>Projeto RSA</title>
+	
+	<link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
 
-            setInterval(function()
-            {
-                lat++;
-                obu1.style.left = lat;
-                obu1.style.top = long;
-            },1);
-        }
-        
-    </script>
-    <div id="obu1"></div>
-    <div id="obu2"></div>
-    <div id="obu3"></div>
-    <div id="obu4"></div>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css" integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ==" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js" integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ==" crossorigin=""></script>
+
+	<style>
+		html, body {
+			height: 100%;
+			margin: 0;
+		}
+		.leaflet-container {
+			height: 100%;
+			width: 100%;
+			max-width: 100%;
+			max-height: 100%;
+		}
+	</style>	
+</head>
+
+<body>
+
+  <div id="map" style="width: 100%; height: 100%;"></div>
+  <script>
+
+    var map = L.map('map').setView([37.6300, -8.08], 16);
+
+    var tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+	var carIcon = L.Icon.extend({
+		options: {
+			iconSize:     [100, 95],
+			iconAnchor:   [22, 94],
+			popupAnchor:  [30, -36]
+		}
+	});
+
+	var car_obu1 = new carIcon({iconUrl: "{{url_for('static', filename='car_icon.png')}}"});
+	var car_obu2 = new carIcon({iconUrl: "{{url_for('static', filename='car_icon.png')}}"});
+	var car_obu3 = new carIcon({iconUrl: "{{url_for('static', filename='car_icon.png')}}"});
+	var car_obu4 = new carIcon({iconUrl: "{{url_for('static', filename='car_icon.png')}}"});
+
+	var mObu1 = L.marker([37.6204, -8.0824], {icon: car_obu1}).bindPopup('OBU1').addTo(map);
+	var mObu2 = L.marker([37.6203, -8.0824], {icon: car_obu2}).bindPopup('OBU2').addTo(map);
+	var mObu3 = L.marker([37.6202, -8.0824], {icon: car_obu3}).bindPopup('OBU3').addTo(map);
+	var mObu4 = L.marker([37.6201, -8.0824], {icon: car_obu4}).bindPopup('OBU4').addTo(map);
+
+  </script>
+
+</body>
 </html>

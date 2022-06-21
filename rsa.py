@@ -7,6 +7,7 @@ import random
 import time
 import json
 import math
+from random import shuffle as shuffle
 
 from paho.mqtt import client as mqtt_client
 
@@ -17,9 +18,9 @@ topic_out = "vanetza/out/cam"
 speed_limit = 30 #m/s = 108km/h
 count = 0
 track = 1000 #m
-theoric_dist = 2 #m
+theoric_dist = 10 #m
 
-class myThread (threading.Thread):
+class OBUthread (threading.Thread):
     def __init__(self, threadID, name, delay, lat,obu_recv):
         threading.Thread.__init__(self)
         self.stationID = threadID
@@ -58,55 +59,38 @@ class myThread (threading.Thread):
 
     def changeLocation(self,json):
         if(self.leader):
-            # print(self.Latitude)
-            # print(self.finishLat)
 
-            if(self.Latitude < self.finishLat):
-                self.speed = 0
+            if(self.Latitude < self.finishLat and self.speed > 0):
+                self.speed -= 10
+                self.Latitude -= (self.speed*self.delay)*100
+            elif(self.Latitude < self.finishLat and self.speed < 1):
                 self.finish = True
-                print("FINISHED")
+                print("FINISHED\n")
             elif(self.speed < speed_limit):
                 self.speed += 3
                 self.Latitude -= (self.speed*self.delay)*100
-                # print(self.speed)
+
             else:
                 self.Latitude -= (self.speed*self.delay)*100
-                # print(self.speed)
-            # self.i+=1  
-            # print("i="+str(self.i))   
-            print("LEADER OBU"+str(self.stationID)+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
-   
+
+
+            print("\nLEADER OBU"+str(self.stationID)+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
         else:
             self.Latitude -= (self.speed*self.delay)*100
-            # if(self.leaderLat == -1):
-            #     self.leaderLat = json["latitude"]*10000000
-            #     self.leaderDist = (self.Latitude - self.leaderLat) / 100   
-            #     # print(str(math.floor(self.leaderDist - theoric_dist))+"m")
-            # else:
-            # print("leader="+str(self.leaderLat) + " my = "+ str(self.Latitude)+"\n")
+
             self.leaderLat = json["latitude"]*10000000
-            self.leaderDist = (self.Latitude - self.leaderLat) / 100
-            # print(str(self.leaderDist)+"\n")
+            self.leaderDist = math.ceil((self.Latitude - self.leaderLat) / 100)
             delta = math.floor((self.leaderDist - theoric_dist))
-            print("obu"+ str(self.stationID)+" dist= "+str(self.leaderDist)+"m")
+            print("obu"+ str(self.stationID)+" dist from vehicle in front("+str(self.OBUinFront) +") = "+str(self.leaderDist)+"m")
 
-            # if(json["speed"] > self.speed and delta > 0 and self.speed < 10):
-            #     # self.speed += delta/self.delay + 2
-            #     self.speed += math.ceil(1.5*self.speed+1)
-            # elif(delta > 0 and self.speed >= 10 and self.speed < 28):
-            #      self.speed += 3 
-            # elif(delta > 20 and self.speed > 20):
-            #     self.speed += 5         
-            # elif(self.speed > 10 and delta < 10):
-            #     self.speed -= math.ceil(self.speed/4)
 
-            if(json["speed"] > self.speed and delta > 0 and self.speed < 25):
+            if(json["speed"] > self.speed and self.leaderDist > 0 and self.speed < 25):
                 # self.speed += delta/self.delay + 2
                 self.speed += 3 
-            elif(delta > 20 and self.speed >= 25 and self.speed < 35):
+            elif(self.leaderDist > 30 and self.speed >= 20 and self.speed < 35):
                 self.speed += 5        
-            elif(self.speed > 30 and delta < 15):
-                self.speed -= math.ceil(self.speed/4)
+            elif(self.speed > 20 and self.leaderDist < 20):
+                self.speed -= math.ceil(self.speed/5)
 
             
             # print("OBU"+str(self.stationID) +" received from "+str(json["stationID"])+ " speed= "+ str(json["speed"]))
@@ -173,7 +157,8 @@ def publish(client,delay,obu):
         # result: [0, 1]
         status = result[0]
         if status == 0:
-            print(f"Send msg to topic `{topic_in}`")
+            # print(f"Send msg to topic `{topic_in}`")
+            a = 1
         else:
             print(f"Failed to send message to this topic {topic_in}")
 
@@ -202,9 +187,15 @@ def subscribe(client: mqtt_client,obu):
     client.on_message = on_message
 
 def getLats():
+    array = [1,2,3,4]
+    shuffle(array)
+
+    for x in range(4):
+        array[x] = 400000000 + array[x]*1000
+
     my_dict = {}
     for x in range(4):
-        my_dict[x] = random.randint(400000000,400001000)
+        my_dict[x] = array[x]
     print(my_dict)
     return my_dict
 
@@ -225,17 +216,17 @@ def sortDict(dict):
 
     return indexes
 
-latitudes_unsorted = getLats()
-latitudes_sorted = sortDict(latitudes_unsorted)
+latitudes = getLats()
+obus_sorted = sortDict(latitudes)
 
-# print(latitudes_sorted)
+print(obus_sorted)
 
 my_list = []
 for x in range(4):
     temp_list = []
     last_element = 0
 
-    for y in latitudes_sorted:
+    for y in obus_sorted:
         if(x == y):
             break
         else:
@@ -247,13 +238,12 @@ for x in range(4):
         last_element = -1
     my_list.append(last_element)
 
-# print(my_list)
 # Create new threads
 freq_sending = 1
-thread1 = myThread(1, "OBU-1", freq_sending, latitudes_unsorted[0], my_list[0])
-thread2 = myThread(2, "OBU-2", freq_sending, latitudes_unsorted[1], my_list[1])
-thread3 = myThread(3, "OBU-3", freq_sending, latitudes_unsorted[2], my_list[2])
-thread4 = myThread(4, "OBU-4", freq_sending, latitudes_unsorted[3], my_list[3])
+thread1 = OBUthread(1, "OBU-1", freq_sending, latitudes[0], my_list[0])
+thread2 = OBUthread(2, "OBU-2", freq_sending, latitudes[1], my_list[1])
+thread3 = OBUthread(3, "OBU-3", freq_sending, latitudes[2], my_list[2])
+thread4 = OBUthread(4, "OBU-4", freq_sending, latitudes[3], my_list[3])
 
 # # Start new Threads
 thread1.start()
