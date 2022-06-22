@@ -80,7 +80,7 @@ def generate_data():
 for j in range(4):
     id = 'server_id'
     clientid = id+str(j)
-    print('192.168.98.' + str(i*10), file=sys.stderr)
+    # print('192.168.98.' + str(i*10), file=sys.stderr)
     client = connect_mqtt(clientid,'192.168.98.' + str(i*10))   
     subscribe(client)
     if i == 1:

@@ -61,7 +61,7 @@ class OBUthread (threading.Thread):
         if(self.leader):
 
             if(self.Latitude < self.finishLat and self.speed > 0):
-                self.speed -= 10
+                self.speed -= 5
                 self.Latitude -= (self.speed*self.delay)*100
             elif(self.Latitude < self.finishLat and self.speed < 1):
                 self.finish = True
@@ -88,9 +88,14 @@ class OBUthread (threading.Thread):
                 # self.speed += delta/self.delay + 2
                 self.speed += 3 
             elif(self.leaderDist > 30 and self.speed >= 20 and self.speed < 35):
-                self.speed += 5        
-            elif(self.speed > 20 and self.leaderDist < 20):
+                self.speed += 5  
+            elif(self.leaderDist < 5):
+                self.speed -= math.ceil(self.speed/2) 
+            elif(self.leaderDist < 10):
+                self.speed -= math.ceil(self.speed/3)          
+            elif(self.leaderDist < 20):
                 self.speed -= math.ceil(self.speed/5)
+                
 
             
             # print("OBU"+str(self.stationID) +" received from "+str(json["stationID"])+ " speed= "+ str(json["speed"]))
