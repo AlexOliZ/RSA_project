@@ -31,7 +31,7 @@
   <div id="map" style="width: 100%; height: 100%;"></div>
   <script>
 
-    var map = L.map('map').setView([37.6300, -8.08], 16);
+    var map = L.map('map').setView([37.655, -8.08], 16);
 
     var tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -41,7 +41,7 @@
 	var carIcon = L.Icon.extend({
 		options: {
 			iconSize:     [100, 95],
-			iconAnchor:   [22, 94],
+			iconAnchor:   [25, 50],
 			popupAnchor:  [30, -36]
 		}
 	});
@@ -51,10 +51,35 @@
 	var car_obu3 = new carIcon({iconUrl: "{{url_for('static', filename='car_icon.png')}}"});
 	var car_obu4 = new carIcon({iconUrl: "{{url_for('static', filename='car_icon.png')}}"});
 
-	var mObu1 = L.marker([37.6204, -8.0824], {icon: car_obu1}).bindPopup('OBU1').addTo(map);
-	var mObu2 = L.marker([37.6203, -8.0824], {icon: car_obu2}).bindPopup('OBU2').addTo(map);
-	var mObu3 = L.marker([37.6202, -8.0824], {icon: car_obu3}).bindPopup('OBU3').addTo(map);
-	var mObu4 = L.marker([37.6201, -8.0824], {icon: car_obu4}).bindPopup('OBU4').addTo(map);
+	var lat1 = 37.6614
+	var lat2 = 37.6613
+	var lat3 = 37.6612
+	var lat4 = 37.6611
+	var long = -8.0810
+
+	var mObu1 = L.marker([lat1, long], {icon: car_obu1}).bindPopup('OBU1').addTo(map);
+	var mObu2 = L.marker([lat2, long], {icon: car_obu2}).bindPopup('OBU2').addTo(map);
+	var mObu3 = L.marker([lat3, long], {icon: car_obu3}).bindPopup('OBU3').addTo(map);
+	var mObu4 = L.marker([lat4, long], {icon: car_obu4}).bindPopup('OBU4').addTo(map);
+	
+	const source = new EventSource("/realtimedata");
+  	source.onmessage = function (event) {
+		const data = JSON.parse(event.data);
+		lat1 = data.obu1
+		lat2 = data.obu2
+		lat3 = data.obu3
+		lat4 = data.obu4
+	}
+
+  // updates the coordinates
+  setInterval(function () {
+    mObu1.setLatLng([lat1, long]).update();
+    mObu2.setLatLng([lat2, long]).update();
+	mObu3.setLatLng([lat3, long]).update();
+    mObu4.setLatLng([lat4, long]).update();
+  }, 200);
+
+
 
   </script>
 

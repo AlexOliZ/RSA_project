@@ -133,7 +133,7 @@ def publish(client,delay,obu):
             "headingConf": 127,
             "latitude": obu.Latitude/10000000,
             "length": 10.0,
-            "longitude": -8.0000000,
+            "longitude": -8.0810000,
             "semiMajorConf": 4095,
             "semiMajorOrient": 3601,
             "semiMinorConf": 4095,
@@ -191,7 +191,7 @@ def getLats():
     shuffle(array)
 
     for x in range(4):
-        array[x] = 400000000 + array[x]*1000
+        array[x] = 376610000 + array[x]*1000
 
     my_dict = {}
     for x in range(4):

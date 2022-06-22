@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, Response
 # from app import create_app
 from flask_mqtt import Mqtt
 import sys
@@ -9,14 +9,14 @@ import time
 
 topic = "vanetza/in/cam"
 i = 1
+lat1 = 37.6614
+lat2 = 37.6613
+lat3 = 37.6612
+lat4 = 37.6611
 
 app = Flask(__name__,
             template_folder='templates')
 
-@app.route('/')
-def index():
-    # get obu's positions
-    return render_template('index.html')
 
 def connect_mqtt(id,broker):
     def on_connect(client, userdata, flags, rc):
@@ -32,10 +32,25 @@ def connect_mqtt(id,broker):
 
 def subscribe(client):
     def on_message(client, userdata, msg):
-        # print("oi")
+        global lat1
+        global lat2
+        global lat3
+        global lat4
+
         payload=msg.payload.decode()
         json_rec = json.loads(payload)
-        print("obu"+str(json_rec["stationID"]) +"lat="+str(json_rec["latitude"]), file=sys.stderr)
+        # print("obu"+str(json_rec["stationID"]) +"lat="+str(json_rec["latitude"]), file=sys.stderr)
+        stationID = json_rec["stationID"]
+        lat = json_rec["latitude"]
+
+        if(stationID == 1):
+            lat1 = lat
+        elif(stationID == 2):
+            lat2 = lat
+        elif(stationID == 3):
+            lat3 = lat
+        elif(stationID == 4):
+            lat4 = lat
     client.subscribe(topic)
     client.on_message = on_message
 
@@ -43,6 +58,24 @@ def looping(client):
     while True:
         client.loop()
         # time.sleep(1)
+
+def generate_data():
+    global lat1
+    global lat2
+    global lat3
+    global lat4
+
+    while True:
+        json_data = json.dumps(
+            {
+                "obu1": lat1,
+                "obu2": lat2,
+                "obu3": lat3,
+                "obu4": lat4,
+            }
+        )
+        yield f"data:{json_data}\n\n"
+        time.sleep(1)
 
 for j in range(4):
     id = 'server_id'
@@ -66,7 +99,14 @@ for j in range(4):
     # client.loop_start()
     i+=1
 
+@app.route('/')
+def index():
+    # get obu's positions
+    return render_template('index.html')
 
+@app.route("/realtimedata")
+def obusdata():
+    return Response(generate_data(), mimetype="text/event-stream")
 
 if __name__ == '__main__':
     app.run(debug=True)
