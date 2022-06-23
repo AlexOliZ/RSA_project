@@ -41,15 +41,15 @@
 	var carIcon = L.Icon.extend({
 		options: {
 			iconSize:     [100, 95],
-			iconAnchor:   [25, 50],
+			iconAnchor:   [50, 50],
 			popupAnchor:  [30, -36]
 		}
 	});
 
-	var car_obu1 = new carIcon({iconUrl: "{{url_for('static', filename='car_icon.png')}}"});
-	var car_obu2 = new carIcon({iconUrl: "{{url_for('static', filename='car_icon.png')}}"});
-	var car_obu3 = new carIcon({iconUrl: "{{url_for('static', filename='car_icon.png')}}"});
-	var car_obu4 = new carIcon({iconUrl: "{{url_for('static', filename='car_icon.png')}}"});
+	var car_obu1 = new carIcon({iconUrl: "{{url_for('static', filename='red-car_icon.png')}}"});
+	var car_obu2 = new carIcon({iconUrl: "{{url_for('static', filename='yellow-car_icon.png')}}"});
+	var car_obu3 = new carIcon({iconUrl: "{{url_for('static', filename='orange-car_icon.png')}}"});
+	var car_obu4 = new carIcon({iconUrl: "{{url_for('static', filename='green-car_icon.png')}}"});
 
 	var lat1 = 37.6614
 	var lat2 = 37.6613
