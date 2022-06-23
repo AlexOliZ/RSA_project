@@ -75,7 +75,7 @@ def generate_data():
             }
         )
         yield f"data:{json_data}\n\n"
-        time.sleep(1)
+        time.sleep(0.1)
 
 for j in range(4):
     id = 'server_id'

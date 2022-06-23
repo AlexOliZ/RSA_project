@@ -1,9 +1,6 @@
 #!/usr/bin/python
 
-from os import stat
-from pydoc import cli
 import threading
-import random
 import time
 import json
 import math
@@ -18,7 +15,6 @@ topic_out = "vanetza/out/cam"
 speed_limit = 30 #m/s = 108km/h
 count = 0
 track = 1000 #m
-theoric_dist = 10 #m
 
 class OBUthread (threading.Thread):
     def __init__(self, threadID, name, delay, lat,obu_recv):
@@ -40,7 +36,6 @@ class OBUthread (threading.Thread):
         self.updateValues = False
         self.finishLat = lat - track*100
         self.finish = False
-        # self.i = 0
 
     def run(self):
         print("Starting " + self.name)
@@ -55,13 +50,11 @@ class OBUthread (threading.Thread):
         subscribe(client,self)
         client.loop_start()
      
-        # print("Exiting " + self.name)
-
     def changeLocation(self,json):
         if(self.leader):
 
             if(self.Latitude < self.finishLat and self.speed > 0):
-                self.speed -= 5
+                self.speed -= 3
                 self.Latitude -= (self.speed*self.delay)*100
             elif(self.Latitude < self.finishLat and self.speed < 1):
                 self.finish = True
@@ -69,38 +62,32 @@ class OBUthread (threading.Thread):
             elif(self.speed < speed_limit):
                 self.speed += 3
                 self.Latitude -= (self.speed*self.delay)*100
-
             else:
                 self.Latitude -= (self.speed*self.delay)*100
-
 
             print("\nLEADER OBU"+str(self.stationID)+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
         else:
             self.Latitude -= (self.speed*self.delay)*100
-
             self.leaderLat = json["latitude"]*10000000
             self.leaderDist = math.ceil((self.Latitude - self.leaderLat) / 100)
-            delta = math.floor((self.leaderDist - theoric_dist))
-            print("obu"+ str(self.stationID)+" dist from vehicle in front("+str(self.OBUinFront) +") = "+str(self.leaderDist)+"m")
+            # print("obu"+ str(self.stationID)+" dist from vehicle in front("+str(self.OBUinFront) +") = "+str(self.leaderDist)+"m")
 
-
-            if(json["speed"] > self.speed and self.leaderDist > 0 and self.speed < 25):
-                # self.speed += delta/self.delay + 2
+            if(json["speed"] > self.speed and self.speed < 20 and self.leaderDist > 20):
                 self.speed += 3 
-            elif(self.leaderDist > 30 and self.speed >= 20 and self.speed < 35):
-                self.speed += 5  
+            elif(self.leaderDist < 35 and self.leaderDist > 20 and json["speed"] > 20):
+                self.speed = json["speed"]
+            elif(self.leaderDist > 30 and self.speed < 35): #and self.speed >= 20 
+                self.speed += 4  
             elif(self.leaderDist < 5):
-                self.speed -= math.ceil(self.speed/2) 
+                self.speed -= math.ceil(self.speed/3) 
             elif(self.leaderDist < 10):
-                self.speed -= math.ceil(self.speed/3)          
+                self.speed -= math.ceil(self.speed/4)          
             elif(self.leaderDist < 20):
                 self.speed -= math.ceil(self.speed/5)
-                
-
-            
-            # print("OBU"+str(self.stationID) +" received from "+str(json["stationID"])+ " speed= "+ str(json["speed"]))
+            # elif(json["speed"] == 0 and self.speed == 0):
+            #     self.finish = True
+                            
             print("OBU"+str(self.stationID)+" received from "+str(json["stationID"])+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
-            # print("OBU"+str(self.stationID)+" received from "+str(json["stationID"])+" with coordinates("+str(json["latitude"])+","+str(json["longitude"])+")")
     
 def connect_mqtt(id,broker):
     def on_connect(client, userdata, flags, rc):
@@ -117,8 +104,6 @@ def connect_mqtt(id,broker):
 def publish(client,delay,obu):
     while True:
         time.sleep(delay)
-        # print(obu.speed)
-        # print(str(obu.stationID)+"this speed isssssss =>"+str(obu.speed))
         if(obu.finish == True):
             client.disconnect()
             break
@@ -154,12 +139,10 @@ def publish(client,delay,obu):
             "stationType": 5,
             "width": 3.0,
             "yawRate": 0
-}
+        }
 
         msg = json.dumps(x)
-        # print(msg)
         result = client.publish(topic_in, msg)
-        # result: [0, 1]
         status = result[0]
         if status == 0:
             # print(f"Send msg to topic `{topic_in}`")
@@ -173,7 +156,6 @@ def subscribe(client: mqtt_client,obu):
 
         m_decode = str(msg.payload.decode())
         m_json = json.loads(m_decode)
-        # speed = m_json["speed"]
 
         if(m_json["stationID"] == obu.OBUinFront):
             obu.changeLocation(m_json)
@@ -185,8 +167,6 @@ def subscribe(client: mqtt_client,obu):
         
         if count == 3:
             count = 0
-            # print("reset")
-        # print(speed)
         # print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
     client.subscribe(topic_out)
     client.on_message = on_message
@@ -244,7 +224,7 @@ for x in range(4):
     my_list.append(last_element)
 
 # Create new threads
-freq_sending = 1
+freq_sending = 0.1
 thread1 = OBUthread(1, "OBU-1", freq_sending, latitudes[0], my_list[0])
 thread2 = OBUthread(2, "OBU-2", freq_sending, latitudes[1], my_list[1])
 thread3 = OBUthread(3, "OBU-3", freq_sending, latitudes[2], my_list[2])
@@ -255,5 +235,3 @@ thread1.start()
 thread2.start()
 thread3.start()
 thread4.start()
-
-# print("Exiting Main Thread")
