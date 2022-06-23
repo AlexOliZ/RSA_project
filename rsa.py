@@ -12,13 +12,19 @@ import sys
 from socket import socket, AF_INET, SOCK_DGRAM
 
 port = 1883
-topic_jetson = "jetson/demn"
+
 topic_in = "vanetza/in/cam"
 topic_out = "vanetza/out/cam"
+topic_denm_in = "vanetza/in/denm"
+topic_denm_out = "vanetza/out/denm"
 
 speed_limit = 30 #m/s = 108km/h
 count = 0
 track = 1000 #m
+
+obstacle = False
+last_denm_time = time.time()
+
 
 ip = "192.168.1.1"
 PORT_NUMBER = 8080
@@ -63,26 +69,36 @@ class OBUthread (threading.Thread):
         client.loop_start()
      
     def changeLocation(self,json):
+        global obstacle
+
         if(self.leader):
 
-            if(self.Latitude < self.finishLat and self.speed > 0):
-                self.speed -= 3
-                self.Latitude -= (self.speed*self.delay)*100
-            elif(self.Latitude < self.finishLat and self.speed < 1):
-                self.finish = True
-                print("FINISHED\n")
-            elif(self.speed < speed_limit):
-                self.speed += 3
-                self.Latitude -= (self.speed*self.delay)*100
-            else:
-                self.Latitude -= (self.speed*self.delay)*100
+            if(obstacle == True):
+                print("Obstacle ahead")
 
-            print("\nLEADER OBU"+str(self.stationID)+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
+                if(self.speed > 10):
+                    self.speed -= 3
+                    self.Latitude -= (self.speed*self.delay)*100
+                else:
+                    self.Latitude -= (self.speed*self.delay)*100
+            else:
+                if(self.Latitude < self.finishLat and self.speed > 0):
+                    self.speed -= 3
+                    self.Latitude -= (self.speed*self.delay)*100
+                elif(self.Latitude < self.finishLat and self.speed < 1):
+                    self.finish = True
+                    print("FINISHED\n")
+                elif(self.speed < speed_limit):
+                    self.speed += 3
+                    self.Latitude -= (self.speed*self.delay)*100
+                else:
+                    self.Latitude -= (self.speed*self.delay)*100
+
+            # print("\nLEADER OBU"+str(self.stationID)+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
         else:
             self.Latitude -= (self.speed*self.delay)*100
             self.leaderLat = json["latitude"]*10000000
             self.leaderDist = math.ceil((self.Latitude - self.leaderLat) / 100)
-            # print("obu"+ str(self.stationID)+" dist from vehicle in front("+str(self.OBUinFront) +") = "+str(self.leaderDist)+"m")
 
             if(json["speed"] > self.speed and self.speed < 20 and self.leaderDist > 20):
                 self.speed += 3 
@@ -99,14 +115,13 @@ class OBUthread (threading.Thread):
             # elif(json["speed"] == 0 and self.speed == 0):
             #     self.finish = True
                             
-            print("OBU"+str(self.stationID)+" received from "+str(json["stationID"])+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
-            # print("OBU"+str(self.stationID)+" received from "+str(json["stationID"])+" with coordinates("+str(json["latitude"])+","+str(json["longitude"])+")")
+            # print("OBU"+str(self.stationID)+" received from "+str(json["stationID"])+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
 
 def listen_jetson(client,obu):
-    listensocket = socket(AF_INET, SOCK_DGRAM)
-    listensocket.bind((ip,PORT_NUMBER))
+    listensocket = socket(AF_INET, SOCK_DGRAM) 
+    listensocket.bind((ip,PORT_NUMBER))               
     while(1):
-        (data,addr) = listensocket.recvfrom(SIZE)
+        (data,addr) = listensocket.recvfrom(SIZE)                     
         # generate demn
         x = {
             "management": {
@@ -135,16 +150,17 @@ def listen_jetson(client,obu):
             "situation": {
                 "informationQuality": 7,
                 "eventType": {
-                    "causeCode": 14,
-                    "subCauseCode": 14
+                    "causeCode": 2,
+                    "subCauseCode": 2
                 }
             }
         }
+        time.sleep(0.1)
         # publish demn
         msg = json.dumps(x)
         # print(msg)
-        result = client.publish(topic_in, msg)
-        print(data,addr)
+        result = client.publish(topic_denm_in, msg)
+        print(data,addr) 
 
 def connect_mqtt(id,broker):
     def on_connect(client, userdata, flags, rc):
@@ -199,7 +215,7 @@ def publish(client,delay,obu):
         }
 
         msg = json.dumps(x)
-        result = client.publish(topic_in, msg)
+        result = client.publish(topic_in, msg)        
         status = result[0]
         if status == 0:
             # print(f"Send msg to topic `{topic_in}`")
@@ -210,22 +226,34 @@ def publish(client,delay,obu):
 def subscribe(client: mqtt_client,obu):
     def on_message(client, userdata, msg):
         global count
+        global obstacle
+        global last_denm_time
 
         m_decode = str(msg.payload.decode())
         m_json = json.loads(m_decode)
 
-        if(m_json["stationID"] == obu.OBUinFront):
-            obu.changeLocation(m_json)
-        elif(obu.OBUinFront == -1 and count < 1):
-            obu.changeLocation(m_json)
-            count += 1
-        elif(obu.OBUinFront == -1 and count >= 1):
-            count += 1
+        if(msg.topic == "vanetza/out/cam"):
+            if(m_json["stationID"] == obu.OBUinFront):
+                obu.changeLocation(m_json)
+            elif(obu.OBUinFront == -1 and count < 1):
+                obu.changeLocation(m_json)
+                count += 1
+            elif(obu.OBUinFront == -1 and count >= 1):
+                count += 1
+            
+            if count == 3:
+                count = 0
+        elif(msg.topic == "vanetza/out/denm"):
+            obstacle = True
+            last_denm_time = time.time()
         
-        if count == 3:
-            count = 0
+        if(last_denm_time-time.time() > 5):
+            obstacle = False
+
+            # print(m_json["fields"]["denm"]["management"]["actionID"]["originatingStationID"])
         # print(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
     client.subscribe(topic_out)
+    client.subscribe(topic_denm_out)
     client.on_message = on_message
 
 def getLats():
@@ -292,6 +320,5 @@ thread1.start()
 thread2.start()
 thread3.start()
 thread4.start()
-thread5.start()
 
 # print("Exiting Main Thread")
