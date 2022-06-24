@@ -25,7 +25,6 @@ track = 1000 #m
 obstacle = False
 last_denm_time = time.time()
 
-
 ip = "192.168.1.1"
 PORT_NUMBER = 8080
 SIZE = 1024
@@ -70,18 +69,16 @@ class OBUthread (threading.Thread):
      
     def changeLocation(self,json):
         global obstacle
-
         if(self.leader):
-
             if(obstacle == True):
                 print("Obstacle ahead")
-
                 if(self.speed > 10):
                     self.speed -= 3
                     self.Latitude -= (self.speed*self.delay)*100
                 else:
                     self.Latitude -= (self.speed*self.delay)*100
             else:
+                print("Moving")
                 if(self.Latitude < self.finishLat and self.speed > 0):
                     self.speed -= 3
                     self.Latitude -= (self.speed*self.delay)*100
@@ -94,7 +91,7 @@ class OBUthread (threading.Thread):
                 else:
                     self.Latitude -= (self.speed*self.delay)*100
 
-            # print("\nLEADER OBU"+str(self.stationID)+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
+            print("\nLEADER OBU"+str(self.stationID)+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
         else:
             self.Latitude -= (self.speed*self.delay)*100
             self.leaderLat = json["latitude"]*10000000
@@ -112,10 +109,13 @@ class OBUthread (threading.Thread):
                 self.speed -= math.ceil(self.speed/4)          
             elif(self.leaderDist < 20):
                 self.speed -= math.ceil(self.speed/5)
+            # elif(self.Latitude < self.finishLat and self.speed < 1):
+            #         self.finish = True
             # elif(json["speed"] == 0 and self.speed == 0):
             #     self.finish = True
                             
-            # print("OBU"+str(self.stationID)+" received from "+str(json["stationID"])+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
+            print("OBU"+str(self.stationID)+" received from "+str(json["stationID"])+" with coordinates("+str(self.Latitude)+","+str(json["longitude"])+") + speed = "+str(self.speed))
+
 
 def listen_jetson(client,obu):
     listensocket = socket(AF_INET, SOCK_DGRAM) 
@@ -126,11 +126,11 @@ def listen_jetson(client,obu):
         x = {
             "management": {
                 "actionID": {
-                    "originatingStationID": 1,
+                    "originatingStationID": obu.stationID,
                     "sequenceNumber": 0
                 },
-                "detectionTime": 1626453837.658,
-                "referenceTime": 1626453837.658,
+                "detectionTime": time.time(),
+                "referenceTime": time.time(),
                 "eventPosition": {
                     "latitude": obu.Latitude/10000000,
                     "longitude": -8.0810000,
@@ -247,7 +247,8 @@ def subscribe(client: mqtt_client,obu):
             obstacle = True
             last_denm_time = time.time()
         
-        if(last_denm_time-time.time() > 5):
+        # print(math.ceil(time.time() - last_denm_time))
+        if(time.time() - last_denm_time > 5):
             obstacle = False
 
             # print(m_json["fields"]["denm"]["management"]["actionID"]["originatingStationID"])
