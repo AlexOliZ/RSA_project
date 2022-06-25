@@ -61,21 +61,21 @@ while True:
     for detection in detections:
         send_message(str(detection))
         check = True 
-
-        # render image
-        output.Render(img)
-        # update the title bar
-        output.SetStatus("{:s} | Network {:.0f} FPS".format(opt.network, net.GetNetworkFPS()))
-        output.Render(img)
-
-        # update the title bar
-        output.SetStatus("{:s} | Network {:.0f} FPS".format(opt.network, net.GetNetworkFPS()))
-
-        # print out performance info
-        net.PrintProfilerTimes()
-        
-        # exit on input/output EOS
         break
+    
+    # render image
+    output.Render(img)
+    
+    # update the title bar
+    output.SetStatus("{:s} | Network {:.0f} FPS".format(opt.network, net.GetNetworkFPS()))
+    output.Render(img)
 
+    # update the title bar
+    output.SetStatus("{:s} | Network {:.0f} FPS".format(opt.network, net.GetNetworkFPS()))
+
+    # print out performance info
+    net.PrintProfilerTimes()
+    
+    # exit on input/output EOS
     if not input.IsStreaming() or not output.IsStreaming() or check:
         break
